@@ -1,0 +1,9 @@
+# Swift build output & packaged app
+.build/
+*.app/
+.DS_Store
+
+# Xcode/SwiftPM
+*.xcodeproj
+*.xcworkspace
+Package.resolved
