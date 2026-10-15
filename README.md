@@ -47,8 +47,11 @@ Sennheiser ACCENTUM / MOMENTUM headphones use **Qualcomm GAIA V3** over a
 **Bluetooth Classic RFCOMM** (Serial Port Profile) channel — *not* BLE. ZenControl:
 
 1. Finds the paired headphone via `IOBluetooth`.
-2. Runs an SDP query and locates the RFCOMM service named **"GAIA"**
-   (on ACCENTUM this is channel 15; falls back to the Serial Port 0x1101 record).
+2. Runs an SDP query and locates the GAIA RFCOMM service — by the name **"GAIA"**
+   or its service-class UUID `a2129ff3-081b-4c45-8afe-469d9c4842ec` (on ACCENTUM
+   this is channel 15). macOS 27's SDP cache drops the service name, so the UUID
+   match is what finds it there. Apple iAP2 / Hands-Free / Headset records are
+   never picked; the Serial Port 0x1101 record is the last resort.
 3. Exchanges GAIA frames (vendor `0x0495` = Sennheiser) over that channel.
 
 ### Diagnostics (no UI)

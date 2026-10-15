@@ -43,6 +43,20 @@ Device: ACCENTUM  [80-c3-ba-7f-48-ca]
   • Hands-Free unit rfcomm=10
 ```
 
+**macOS 27:** the cached SDP records no longer carry the ServiceName (0x0100) for
+the GAIA record, and ServiceClassIDList (0x0001) comes back as a bare UUID instead
+of a sequence. The GAIA record is still identifiable by its service-class UUID
+`a2129ff3-081b-4c45-8afe-469d9c4842ec` (the same UUID BLE models use as a GATT
+service). Note channel **14** is Apple **iAP2** (`00000000-deca-fade-deca-deafdecacaff`):
+opening it and sending GAIA frames makes the headset power off, so never fall back to it.
+
+```
+Device: ACCENTUM  [80-c3-ba-7f-48-ca]       (macOS 27)
+  • (unnamed)        rfcomm=14  uuids=[00000000-deca-fade-deca-deafdecacaff]   iAP2
+  • Hands-Free unit  rfcomm=10  uuids=[0x111e]
+  • (unnamed)        rfcomm=15  uuids=[a2129ff3-081b-4c45-8afe-469d9c4842ec]   GAIA
+```
+
 ## GAIA V3 frame format
 
 ```
