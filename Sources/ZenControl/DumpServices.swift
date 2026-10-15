@@ -23,13 +23,7 @@ func dumpServices() {
             var channel: BluetoothRFCOMMChannelID = 0
             let hasRFCOMM = rec.getRFCOMMChannelID(&channel) == kIOReturnSuccess
             let name = rec.getServiceName() ?? "(unnamed)"
-            var uuids: [String] = []
-            if let attr = rec.getAttributeDataElement(0x0001), // ServiceClassIDList
-               let list = attr.getArrayValue() as? [IOBluetoothSDPDataElement] {
-                for e in list {
-                    if let u = e.getUUIDValue() { uuids.append(u.description) }
-                }
-            }
+            let uuids = rec.serviceClassUUIDs.map { $0.description }
             print(String(format: "  • %-26@  rfcomm=%@  uuids=[%@]",
                          name as NSString,
                          hasRFCOMM ? "\(channel)" : "—",

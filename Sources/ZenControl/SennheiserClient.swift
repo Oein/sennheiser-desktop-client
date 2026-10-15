@@ -87,6 +87,22 @@ final class SennheiserClient: NSObject, ObservableObject {
         rxBuffer.removeAll()
     }
 
+    /// Service-class UUID of Sennheiser's GAIA RFCOMM record (RFCOMM 15 on ACCENTUM).
+    static let gaiaUUID = sdpUUID128([0xa2, 0x12, 0x9f, 0xf3, 0x08, 0x1b, 0x4c, 0x45,
+                                      0x8a, 0xfe, 0x46, 0x9d, 0x9c, 0x48, 0x42, 0xec])
+
+    /// RFCOMM services that are never GAIA: Apple iAP2, Hands-Free, Headset.
+    static let excludedUUIDs: [IOBluetoothSDPUUID] = [
+        sdpUUID128([0x00, 0x00, 0x00, 0x00, 0xde, 0xca, 0xfa, 0xde,
+                    0xde, 0xca, 0xde, 0xaf, 0xde, 0xca, 0xca, 0xff]),
+        IOBluetoothSDPUUID(uuid16: 0x111e), IOBluetoothSDPUUID(uuid16: 0x111f),
+        IOBluetoothSDPUUID(uuid16: 0x1108), IOBluetoothSDPUUID(uuid16: 0x1112),
+    ]
+
+    private static func sdpUUID128(_ bytes: [UInt8]) -> IOBluetoothSDPUUID {
+        IOBluetoothSDPUUID(bytes: bytes, length: bytes.count)
+    }
+
     private func openSerialPortChannel(on dev: IOBluetoothDevice) {
         // Sennheiser exposes the GAIA control channel as an SDP record literally
         // named "GAIA" (an RFCOMM/SPP service, distinct from the Hands-Free unit).
@@ -94,15 +110,20 @@ final class SennheiserClient: NSObject, ObservableObject {
         var found = false
 
         if let records = dev.services as? [IOBluetoothSDPServiceRecord] {
-            // 1) prefer the record named "GAIA"
-            for rec in records where (rec.getServiceName() ?? "").uppercased() == "GAIA" {
+            // 1) prefer the record named "GAIA" or carrying the Sennheiser GAIA UUID.
+            //    macOS 27 no longer keeps the ServiceName attribute for this record in
+            //    its SDP cache, so the UUID match is what actually finds it there.
+            for rec in records where (rec.getServiceName() ?? "").uppercased() == "GAIA"
+                || rec.serviceClassUUIDs.contains(where: { $0.isEqual(to: Self.gaiaUUID) }) {
                 if rec.getRFCOMMChannelID(&channelID) == kIOReturnSuccess { found = true; break }
             }
-            // 2) otherwise the first RFCOMM record that is NOT Hands-Free / Headset
+            // 2) otherwise the first RFCOMM record that is NOT Hands-Free / Headset / iAP2
             if !found {
                 for rec in records {
                     let name = (rec.getServiceName() ?? "").lowercased()
                     if name.contains("hands-free") || name.contains("headset") { continue }
+                    let uuids = rec.serviceClassUUIDs
+                    if uuids.contains(where: { u in Self.excludedUUIDs.contains { u.isEqual(to: $0) } }) { continue }
                     if rec.getRFCOMMChannelID(&channelID) == kIOReturnSuccess { found = true; break }
                 }
             }
@@ -480,5 +501,18 @@ extension SennheiserClient: IOBluetoothRFCOMMChannelDelegate {
         isConnected = false
         channel = nil
         notify()
+    }
+}
+
+// MARK: - SDP helpers
+
+extension IOBluetoothSDPServiceRecord {
+    /// ServiceClassIDList (0x0001) UUIDs. Accepts both the spec'd sequence form and
+    /// the bare single UUID that macOS 27's SDP cache returns.
+    var serviceClassUUIDs: [IOBluetoothSDPUUID] {
+        guard let attr = getAttributeDataElement(0x0001) else { return [] }
+        if let u = attr.getUUIDValue() { return [u] }
+        let list = (attr.getArrayValue() as? [IOBluetoothSDPDataElement]) ?? []
+        return list.compactMap { $0.getUUIDValue() }
     }
 }
